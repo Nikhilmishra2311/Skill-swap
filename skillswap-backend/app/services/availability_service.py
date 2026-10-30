@@ -98,6 +98,7 @@ def update_availability(
     slot_id: int,
     user_id: int,
     day: str,
+    availability_date: date,
     start_time: str,
     end_time: str
 ):
@@ -108,12 +109,12 @@ def update_availability(
     )
 
     if not slot:
-        raise Exception(
+        raise LookupError(
             "Availability slot not found"
         )
 
     if slot.user_id != user_id:
-        raise Exception(
+        raise PermissionError(
             "Unauthorized"
         )
 
@@ -123,6 +124,7 @@ def update_availability(
         select(AvailabilitySlot).where(
             AvailabilitySlot.user_id == user_id,
             AvailabilitySlot.day == day,
+            AvailabilitySlot.availability_date == availability_date,
             AvailabilitySlot.id != slot_id,
             AvailabilitySlot.is_active == True
         )
@@ -135,11 +137,12 @@ def update_availability(
             and
             end_time > existing.start_time
         ):
-            raise Exception(
+            raise ValueError(
                 "Time slot overlaps with existing availability"
             )
 
     slot.day = day
+    slot.availability_date = availability_date
     slot.start_time = start_time
     slot.end_time = end_time
 

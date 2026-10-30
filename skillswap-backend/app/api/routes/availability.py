@@ -97,16 +97,22 @@ def update_availability_api(
 
 ):
 
-    return update_availability(
-
-        db,
-
-        availability_id,
-
-        current_user.id,
-
-        data
-    )
+    try:
+        return update_availability(
+            db,
+            availability_id,
+            current_user.id,
+            data.day,
+            data.availability_date,
+            data.start_time,
+            data.end_time
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @router.delete("/{slot_id}")

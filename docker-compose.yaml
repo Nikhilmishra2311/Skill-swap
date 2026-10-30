@@ -1,5 +1,4 @@
 services:
-
   # ==========================================
   # Backend - FastAPI
   # ==========================================
@@ -7,107 +6,82 @@ services:
     build:
       context: ./skillswap-backend
       dockerfile: Dockerfile
-
     container_name: skillswap-backend
-
     restart: unless-stopped
-
     env_file:
       - ./skillswap-backend/.env
-
     environment:
       TZ: Asia/Kolkata
       RUNNING_IN_DOCKER: "true"
-      DATABASE_URL: postgresql+psycopg2://postgres:12345678@postgres:5432/skillswap
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: admin
-      MINIO_SECRET_KEY: password123
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in skillswap-backend/.env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in skillswap-backend/.env}
       MINIO_SECURE: "false"
-
     ports:
       - "8000:8000"
-
     volumes:
       - ./skillswap-backend:/app
-
     depends_on:
       postgres:
         condition: service_healthy
-
       redis:
         condition: service_healthy
-
       minio:
         condition: service_started
-
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
       --port 8000
       --reload
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # PostgreSQL
   # ==========================================
   postgres:
     image: postgres:16-alpine
-
     container_name: skillswap-postgres
-
     restart: unless-stopped
-
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 12345678
-      POSTGRES_DB: skillswap
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in skillswap-backend/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in skillswap-backend/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in skillswap-backend/.env}
       TZ: Asia/Kolkata
       PGTZ: Asia/Kolkata
-
     ports:
-      - "5433:5432"
-
+      - "${POSTGRES_EXPOSED_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U postgres -d skillswap"
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
         ]
       interval: 10s
       timeout: 5s
       retries: 5
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # Redis
   # ==========================================
   redis:
     image: redis:7-alpine
-
     container_name: skillswap-redis
-
     restart: unless-stopped
-
     ports:
       - "6379:6379"
-
     volumes:
       - redis_data:/data
-
     healthcheck:
       test:
         [
@@ -118,38 +92,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # MinIO
   # ==========================================
   minio:
     image: minio/minio
-
     container_name: skillswap-minio
-
     restart: unless-stopped
-
     command:
       server /data --console-address ":9001"
-
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
-
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in skillswap-backend/.env}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in skillswap-backend/.env}
     ports:
       - "9000:9000"
       - "9001:9001"
-
     volumes:
       - minio_data:/data
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # Celery Worker
@@ -158,50 +122,39 @@ services:
     build:
       context: ./skillswap-backend
       dockerfile: Dockerfile
-
     container_name: skillswap-celery
-
     restart: unless-stopped
-
     env_file:
       - ./skillswap-backend/.env
-
     environment:
       TZ: Asia/Kolkata
       RUNNING_IN_DOCKER: "true"
-      DATABASE_URL: postgresql+psycopg2://postgres:12345678@postgres:5432/skillswap
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: admin
-      MINIO_SECRET_KEY: password123
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in skillswap-backend/.env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in skillswap-backend/.env}
       MINIO_SECURE: "false"
-
     depends_on:
       postgres:
         condition: service_healthy
-
       redis:
         condition: service_healthy
-
       minio:
         condition: service_started
-
     volumes:
       - ./skillswap-backend:/app
-
     command: >
       celery
       -A app.tasks.celery_app.celery
       worker
       --loglevel=info
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # Celery Beat
@@ -210,97 +163,70 @@ services:
     build:
       context: ./skillswap-backend
       dockerfile: Dockerfile
-
     container_name: skillswap-celery-beat
-
     restart: unless-stopped
-
     env_file:
       - ./skillswap-backend/.env
-
     environment:
       TZ: Asia/Kolkata
       RUNNING_IN_DOCKER: "true"
-      DATABASE_URL: postgresql+psycopg2://postgres:12345678@postgres:5432/skillswap
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: admin
-      MINIO_SECRET_KEY: password123
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in skillswap-backend/.env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in skillswap-backend/.env}
       MINIO_SECURE: "false"
-
     depends_on:
       postgres:
         condition: service_healthy
-
       redis:
         condition: service_healthy
-
       minio:
         condition: service_started
-
     volumes:
       - ./skillswap-backend:/app
-
     command: >
       celery
       -A app.tasks.celery_app.celery
       beat
       --loglevel=info
-
     networks:
       - skillswap-network
-
 
   # ==========================================
   # Flower
   # ==========================================
   flower:
     image: mher/flower
-
     container_name: skillswap-flower
-
     restart: unless-stopped
-
     ports:
       - "5555:5555"
-
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       TZ: Asia/Kolkata
-
     depends_on:
       celery:
         condition: service_started
-
       redis:
         condition: service_healthy
-
     command: >
       celery
       --broker=redis://redis:6379/0
       flower
       --port=5555
-
     networks:
       - skillswap-network
 
-
-# ==========================================
-# Volumes
-# ==========================================
 volumes:
   postgres_data:
   redis_data:
   minio_data:
 
-
-# ==========================================
-# Network
-# ==========================================
 networks:
   skillswap-network:
     driver: bridge
